@@ -18,16 +18,67 @@ var _ = context.Background
 var _ = reflect.DeepEqual
 var _ = bytes.Equal
 
+type ExampleException struct {
+}
+
+func NewExampleException() *ExampleException {
+  return &ExampleException{}
+}
+
+func (p *ExampleException) Read(iprot thrift.TProtocol) error {
+  if _, err := iprot.ReadStructBegin(); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
+  }
+
+
+  for {
+    _, fieldTypeId, fieldId, err := iprot.ReadFieldBegin()
+    if err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+    }
+    if fieldTypeId == thrift.STOP { break; }
+    if err := iprot.Skip(fieldTypeId); err != nil {
+      return err
+    }
+    if err := iprot.ReadFieldEnd(); err != nil {
+      return err
+    }
+  }
+  if err := iprot.ReadStructEnd(); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+  }
+  return nil
+}
+
+func (p *ExampleException) Write(oprot thrift.TProtocol) error {
+  if err := oprot.WriteStructBegin("ExampleException"); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
+  if p != nil {
+  }
+  if err := oprot.WriteFieldStop(); err != nil {
+    return thrift.PrependError("write field stop error: ", err) }
+  if err := oprot.WriteStructEnd(); err != nil {
+    return thrift.PrependError("write struct stop error: ", err) }
+  return nil
+}
+
+func (p *ExampleException) String() string {
+  if p == nil {
+    return "<nil>"
+  }
+  return fmt.Sprintf("ExampleException(%+v)", *p)
+}
+
+func (p *ExampleException) Error() string {
+  return p.String()
+}
+
 type Example interface {
   // Parameters:
   //  - Num1
   //  - Num2
   Add(ctx context.Context, num1 int64, num2 int64) (r int64, err error)
-  // Parameters:
-  //  - Num1
-  //  - Num2
-  //  - TimeoutMS
-  TimeoutedAdd(ctx context.Context, num1 int64, num2 int64, timeoutMS int64) (r int64, err error)
+  Fail(ctx context.Context) (r bool, err error)
 }
 
 type ExampleClient struct {
@@ -68,19 +119,17 @@ func (p *ExampleClient) Add(ctx context.Context, num1 int64, num2 int64) (r int6
   return _result1.GetSuccess(), nil
 }
 
-// Parameters:
-//  - Num1
-//  - Num2
-//  - TimeoutMS
-func (p *ExampleClient) TimeoutedAdd(ctx context.Context, num1 int64, num2 int64, timeoutMS int64) (r int64, err error) {
-  var _args2 ExampleTimeoutedAddArgs
-  _args2.Num1 = num1
-  _args2.Num2 = num2
-  _args2.TimeoutMS = timeoutMS
-  var _result3 ExampleTimeoutedAddResult
-  if err = p.c.Call(ctx, "TimeoutedAdd", &_args2, &_result3); err != nil {
+func (p *ExampleClient) Fail(ctx context.Context) (r bool, err error) {
+  var _args2 ExampleFailArgs
+  var _result3 ExampleFailResult
+  if err = p.c.Call(ctx, "Fail", &_args2, &_result3); err != nil {
     return
   }
+  switch {
+  case _result3.Excp!= nil:
+    return r, _result3.Excp
+  }
+
   return _result3.GetSuccess(), nil
 }
 
@@ -106,7 +155,7 @@ func NewExampleProcessor(handler Example) *ExampleProcessor {
 
   self4 := &ExampleProcessor{handler:handler, processorMap:make(map[string]thrift.TProcessorFunction)}
   self4.processorMap["Add"] = &exampleProcessorAdd{handler:handler}
-  self4.processorMap["TimeoutedAdd"] = &exampleProcessorTimeoutedAdd{handler:handler}
+  self4.processorMap["Fail"] = &exampleProcessorFail{handler:handler}
 return self4
 }
 
@@ -175,16 +224,16 @@ var retval int64
   return true, err
 }
 
-type exampleProcessorTimeoutedAdd struct {
+type exampleProcessorFail struct {
   handler Example
 }
 
-func (p *exampleProcessorTimeoutedAdd) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-  args := ExampleTimeoutedAddArgs{}
+func (p *exampleProcessorFail) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+  args := ExampleFailArgs{}
   if err = args.Read(iprot); err != nil {
     iprot.ReadMessageEnd()
     x := thrift.NewTApplicationException(thrift.PROTOCOL_ERROR, err.Error())
-    oprot.WriteMessageBegin("TimeoutedAdd", thrift.EXCEPTION, seqId)
+    oprot.WriteMessageBegin("Fail", thrift.EXCEPTION, seqId)
     x.Write(oprot)
     oprot.WriteMessageEnd()
     oprot.Flush()
@@ -192,20 +241,25 @@ func (p *exampleProcessorTimeoutedAdd) Process(ctx context.Context, seqId int32,
   }
 
   iprot.ReadMessageEnd()
-  result := ExampleTimeoutedAddResult{}
-var retval int64
+  result := ExampleFailResult{}
+var retval bool
   var err2 error
-  if retval, err2 = p.handler.TimeoutedAdd(ctx, args.Num1, args.Num2, args.TimeoutMS); err2 != nil {
-    x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing TimeoutedAdd: " + err2.Error())
-    oprot.WriteMessageBegin("TimeoutedAdd", thrift.EXCEPTION, seqId)
+  if retval, err2 = p.handler.Fail(ctx); err2 != nil {
+  switch v := err2.(type) {
+    case *ExampleException:
+  result.Excp = v
+    default:
+    x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing Fail: " + err2.Error())
+    oprot.WriteMessageBegin("Fail", thrift.EXCEPTION, seqId)
     x.Write(oprot)
     oprot.WriteMessageEnd()
     oprot.Flush()
     return true, err2
+  }
   } else {
     result.Success = &retval
 }
-  if err2 = oprot.WriteMessageBegin("TimeoutedAdd", thrift.REPLY, seqId); err2 != nil {
+  if err2 = oprot.WriteMessageBegin("Fail", thrift.REPLY, seqId); err2 != nil {
     err = err2
   }
   if err2 = result.Write(oprot); err == nil && err2 != nil {
@@ -453,33 +507,14 @@ func (p *ExampleAddResult) String() string {
   return fmt.Sprintf("ExampleAddResult(%+v)", *p)
 }
 
-// Attributes:
-//  - Num1
-//  - Num2
-//  - TimeoutMS
-type ExampleTimeoutedAddArgs struct {
-  Num1 int64 `thrift:"num1,1" db:"num1" json:"num1"`
-  Num2 int64 `thrift:"num2,2" db:"num2" json:"num2"`
-  TimeoutMS int64 `thrift:"timeoutMS,3" db:"timeoutMS" json:"timeoutMS"`
+type ExampleFailArgs struct {
 }
 
-func NewExampleTimeoutedAddArgs() *ExampleTimeoutedAddArgs {
-  return &ExampleTimeoutedAddArgs{}
+func NewExampleFailArgs() *ExampleFailArgs {
+  return &ExampleFailArgs{}
 }
 
-
-func (p *ExampleTimeoutedAddArgs) GetNum1() int64 {
-  return p.Num1
-}
-
-func (p *ExampleTimeoutedAddArgs) GetNum2() int64 {
-  return p.Num2
-}
-
-func (p *ExampleTimeoutedAddArgs) GetTimeoutMS() int64 {
-  return p.TimeoutMS
-}
-func (p *ExampleTimeoutedAddArgs) Read(iprot thrift.TProtocol) error {
+func (p *ExampleFailArgs) Read(iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -491,41 +526,8 @@ func (p *ExampleTimeoutedAddArgs) Read(iprot thrift.TProtocol) error {
       return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
     }
     if fieldTypeId == thrift.STOP { break; }
-    switch fieldId {
-    case 1:
-      if fieldTypeId == thrift.I64 {
-        if err := p.ReadField1(iprot); err != nil {
-          return err
-        }
-      } else {
-        if err := iprot.Skip(fieldTypeId); err != nil {
-          return err
-        }
-      }
-    case 2:
-      if fieldTypeId == thrift.I64 {
-        if err := p.ReadField2(iprot); err != nil {
-          return err
-        }
-      } else {
-        if err := iprot.Skip(fieldTypeId); err != nil {
-          return err
-        }
-      }
-    case 3:
-      if fieldTypeId == thrift.I64 {
-        if err := p.ReadField3(iprot); err != nil {
-          return err
-        }
-      } else {
-        if err := iprot.Skip(fieldTypeId); err != nil {
-          return err
-        }
-      }
-    default:
-      if err := iprot.Skip(fieldTypeId); err != nil {
-        return err
-      }
+    if err := iprot.Skip(fieldTypeId); err != nil {
+      return err
     }
     if err := iprot.ReadFieldEnd(); err != nil {
       return err
@@ -537,40 +539,10 @@ func (p *ExampleTimeoutedAddArgs) Read(iprot thrift.TProtocol) error {
   return nil
 }
 
-func (p *ExampleTimeoutedAddArgs)  ReadField1(iprot thrift.TProtocol) error {
-  if v, err := iprot.ReadI64(); err != nil {
-  return thrift.PrependError("error reading field 1: ", err)
-} else {
-  p.Num1 = v
-}
-  return nil
-}
-
-func (p *ExampleTimeoutedAddArgs)  ReadField2(iprot thrift.TProtocol) error {
-  if v, err := iprot.ReadI64(); err != nil {
-  return thrift.PrependError("error reading field 2: ", err)
-} else {
-  p.Num2 = v
-}
-  return nil
-}
-
-func (p *ExampleTimeoutedAddArgs)  ReadField3(iprot thrift.TProtocol) error {
-  if v, err := iprot.ReadI64(); err != nil {
-  return thrift.PrependError("error reading field 3: ", err)
-} else {
-  p.TimeoutMS = v
-}
-  return nil
-}
-
-func (p *ExampleTimeoutedAddArgs) Write(oprot thrift.TProtocol) error {
-  if err := oprot.WriteStructBegin("TimeoutedAdd_args"); err != nil {
+func (p *ExampleFailArgs) Write(oprot thrift.TProtocol) error {
+  if err := oprot.WriteStructBegin("Fail_args"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
-    if err := p.writeField1(oprot); err != nil { return err }
-    if err := p.writeField2(oprot); err != nil { return err }
-    if err := p.writeField3(oprot); err != nil { return err }
   }
   if err := oprot.WriteFieldStop(); err != nil {
     return thrift.PrependError("write field stop error: ", err) }
@@ -579,65 +551,48 @@ func (p *ExampleTimeoutedAddArgs) Write(oprot thrift.TProtocol) error {
   return nil
 }
 
-func (p *ExampleTimeoutedAddArgs) writeField1(oprot thrift.TProtocol) (err error) {
-  if err := oprot.WriteFieldBegin("num1", thrift.I64, 1); err != nil {
-    return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:num1: ", p), err) }
-  if err := oprot.WriteI64(int64(p.Num1)); err != nil {
-  return thrift.PrependError(fmt.Sprintf("%T.num1 (1) field write error: ", p), err) }
-  if err := oprot.WriteFieldEnd(); err != nil {
-    return thrift.PrependError(fmt.Sprintf("%T write field end error 1:num1: ", p), err) }
-  return err
-}
-
-func (p *ExampleTimeoutedAddArgs) writeField2(oprot thrift.TProtocol) (err error) {
-  if err := oprot.WriteFieldBegin("num2", thrift.I64, 2); err != nil {
-    return thrift.PrependError(fmt.Sprintf("%T write field begin error 2:num2: ", p), err) }
-  if err := oprot.WriteI64(int64(p.Num2)); err != nil {
-  return thrift.PrependError(fmt.Sprintf("%T.num2 (2) field write error: ", p), err) }
-  if err := oprot.WriteFieldEnd(); err != nil {
-    return thrift.PrependError(fmt.Sprintf("%T write field end error 2:num2: ", p), err) }
-  return err
-}
-
-func (p *ExampleTimeoutedAddArgs) writeField3(oprot thrift.TProtocol) (err error) {
-  if err := oprot.WriteFieldBegin("timeoutMS", thrift.I64, 3); err != nil {
-    return thrift.PrependError(fmt.Sprintf("%T write field begin error 3:timeoutMS: ", p), err) }
-  if err := oprot.WriteI64(int64(p.TimeoutMS)); err != nil {
-  return thrift.PrependError(fmt.Sprintf("%T.timeoutMS (3) field write error: ", p), err) }
-  if err := oprot.WriteFieldEnd(); err != nil {
-    return thrift.PrependError(fmt.Sprintf("%T write field end error 3:timeoutMS: ", p), err) }
-  return err
-}
-
-func (p *ExampleTimeoutedAddArgs) String() string {
+func (p *ExampleFailArgs) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ExampleTimeoutedAddArgs(%+v)", *p)
+  return fmt.Sprintf("ExampleFailArgs(%+v)", *p)
 }
 
 // Attributes:
 //  - Success
-type ExampleTimeoutedAddResult struct {
-  Success *int64 `thrift:"success,0" db:"success" json:"success,omitempty"`
+//  - Excp
+type ExampleFailResult struct {
+  Success *bool `thrift:"success,0" db:"success" json:"success,omitempty"`
+  Excp *ExampleException `thrift:"excp,1" db:"excp" json:"excp,omitempty"`
 }
 
-func NewExampleTimeoutedAddResult() *ExampleTimeoutedAddResult {
-  return &ExampleTimeoutedAddResult{}
+func NewExampleFailResult() *ExampleFailResult {
+  return &ExampleFailResult{}
 }
 
-var ExampleTimeoutedAddResult_Success_DEFAULT int64
-func (p *ExampleTimeoutedAddResult) GetSuccess() int64 {
+var ExampleFailResult_Success_DEFAULT bool
+func (p *ExampleFailResult) GetSuccess() bool {
   if !p.IsSetSuccess() {
-    return ExampleTimeoutedAddResult_Success_DEFAULT
+    return ExampleFailResult_Success_DEFAULT
   }
 return *p.Success
 }
-func (p *ExampleTimeoutedAddResult) IsSetSuccess() bool {
+var ExampleFailResult_Excp_DEFAULT *ExampleException
+func (p *ExampleFailResult) GetExcp() *ExampleException {
+  if !p.IsSetExcp() {
+    return ExampleFailResult_Excp_DEFAULT
+  }
+return p.Excp
+}
+func (p *ExampleFailResult) IsSetSuccess() bool {
   return p.Success != nil
 }
 
-func (p *ExampleTimeoutedAddResult) Read(iprot thrift.TProtocol) error {
+func (p *ExampleFailResult) IsSetExcp() bool {
+  return p.Excp != nil
+}
+
+func (p *ExampleFailResult) Read(iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -651,8 +606,18 @@ func (p *ExampleTimeoutedAddResult) Read(iprot thrift.TProtocol) error {
     if fieldTypeId == thrift.STOP { break; }
     switch fieldId {
     case 0:
-      if fieldTypeId == thrift.I64 {
+      if fieldTypeId == thrift.BOOL {
         if err := p.ReadField0(iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 1:
+      if fieldTypeId == thrift.STRUCT {
+        if err := p.ReadField1(iprot); err != nil {
           return err
         }
       } else {
@@ -675,8 +640,8 @@ func (p *ExampleTimeoutedAddResult) Read(iprot thrift.TProtocol) error {
   return nil
 }
 
-func (p *ExampleTimeoutedAddResult)  ReadField0(iprot thrift.TProtocol) error {
-  if v, err := iprot.ReadI64(); err != nil {
+func (p *ExampleFailResult)  ReadField0(iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadBool(); err != nil {
   return thrift.PrependError("error reading field 0: ", err)
 } else {
   p.Success = &v
@@ -684,11 +649,20 @@ func (p *ExampleTimeoutedAddResult)  ReadField0(iprot thrift.TProtocol) error {
   return nil
 }
 
-func (p *ExampleTimeoutedAddResult) Write(oprot thrift.TProtocol) error {
-  if err := oprot.WriteStructBegin("TimeoutedAdd_result"); err != nil {
+func (p *ExampleFailResult)  ReadField1(iprot thrift.TProtocol) error {
+  p.Excp = &ExampleException{}
+  if err := p.Excp.Read(iprot); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Excp), err)
+  }
+  return nil
+}
+
+func (p *ExampleFailResult) Write(oprot thrift.TProtocol) error {
+  if err := oprot.WriteStructBegin("Fail_result"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
     if err := p.writeField0(oprot); err != nil { return err }
+    if err := p.writeField1(oprot); err != nil { return err }
   }
   if err := oprot.WriteFieldStop(); err != nil {
     return thrift.PrependError("write field stop error: ", err) }
@@ -697,11 +671,11 @@ func (p *ExampleTimeoutedAddResult) Write(oprot thrift.TProtocol) error {
   return nil
 }
 
-func (p *ExampleTimeoutedAddResult) writeField0(oprot thrift.TProtocol) (err error) {
+func (p *ExampleFailResult) writeField0(oprot thrift.TProtocol) (err error) {
   if p.IsSetSuccess() {
-    if err := oprot.WriteFieldBegin("success", thrift.I64, 0); err != nil {
+    if err := oprot.WriteFieldBegin("success", thrift.BOOL, 0); err != nil {
       return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err) }
-    if err := oprot.WriteI64(int64(*p.Success)); err != nil {
+    if err := oprot.WriteBool(bool(*p.Success)); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T.success (0) field write error: ", p), err) }
     if err := oprot.WriteFieldEnd(); err != nil {
       return thrift.PrependError(fmt.Sprintf("%T write field end error 0:success: ", p), err) }
@@ -709,11 +683,24 @@ func (p *ExampleTimeoutedAddResult) writeField0(oprot thrift.TProtocol) (err err
   return err
 }
 
-func (p *ExampleTimeoutedAddResult) String() string {
+func (p *ExampleFailResult) writeField1(oprot thrift.TProtocol) (err error) {
+  if p.IsSetExcp() {
+    if err := oprot.WriteFieldBegin("excp", thrift.STRUCT, 1); err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:excp: ", p), err) }
+    if err := p.Excp.Write(oprot); err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", p.Excp), err)
+    }
+    if err := oprot.WriteFieldEnd(); err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T write field end error 1:excp: ", p), err) }
+  }
+  return err
+}
+
+func (p *ExampleFailResult) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ExampleTimeoutedAddResult(%+v)", *p)
+  return fmt.Sprintf("ExampleFailResult(%+v)", *p)
 }
 
 

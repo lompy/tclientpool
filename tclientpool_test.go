@@ -2,10 +2,8 @@ package tclientpool
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
-	"time"
 
 	"tclientpool/example"
 
@@ -14,23 +12,20 @@ import (
 
 type handler struct{}
 
-func (h handler) Add(_c context.Context, num1 int64, num2 int64) (int64, error) {
+func (h handler) Add(_c context.Context, num1, num2 int64) (int64, error) {
 	return num1 + num2, nil
 }
 
-func (h handler) TimeoutedAdd(_c context.Context, num1 int64, num2 int64, timeoutMS int64) (int64, error) {
-	time.Sleep(time.Duration(timeoutMS) * time.Millisecond)
-	return num1 + num2, nil
+func (h handler) Fail(_c context.Context) (bool, error) {
+	panic("test")
 }
 
 const addr = "localhost:9090"
 
 func Test_ParallelCalls(t *testing.T) {
-	fmt.Println(thrift.NewTBinaryProtocolFactoryDefault())
-
 	transport, err := thrift.NewTServerSocket(addr)
 	if err != nil {
-		fmt.Println(err)
+		t.Error(err)
 	}
 	processor := example.NewExampleProcessor(handler{})
 	server := thrift.NewTSimpleServer2(processor, transport)
@@ -60,13 +55,17 @@ func Test_ParallelCalls(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			for y := 0; y < 100; y++ {
+			for y := 0; y < 50; y++ {
 				sum, err := client.Add(context.Background(), int64(i), int64(y))
 				if err != nil {
 					t.Error("client add error: ", err)
 				}
 				if sum != int64(i+y) {
 					t.Errorf("invalid sum; got: %d, expected: %d", sum, i+y)
+				}
+				_, err = client.Fail(context.Background())
+				if err == nil || err.Error() != "EOF" {
+					t.Error("invalid error returned from Fail()")
 				}
 			}
 		}(i)

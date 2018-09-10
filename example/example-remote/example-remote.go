@@ -23,7 +23,7 @@ func Usage() {
   flag.PrintDefaults()
   fmt.Fprintln(os.Stderr, "\nFunctions:")
   fmt.Fprintln(os.Stderr, "  i64 Add(i64 num1, i64 num2)")
-  fmt.Fprintln(os.Stderr, "  i64 TimeoutedAdd(i64 num1, i64 num2, i64 timeoutMS)")
+  fmt.Fprintln(os.Stderr, "  bool Fail()")
   fmt.Fprintln(os.Stderr)
   os.Exit(0)
 }
@@ -141,30 +141,12 @@ func main() {
     fmt.Print(client.Add(context.Background(), value0, value1))
     fmt.Print("\n")
     break
-  case "TimeoutedAdd":
-    if flag.NArg() - 1 != 3 {
-      fmt.Fprintln(os.Stderr, "TimeoutedAdd requires 3 args")
+  case "Fail":
+    if flag.NArg() - 1 != 0 {
+      fmt.Fprintln(os.Stderr, "Fail requires 0 args")
       flag.Usage()
     }
-    argvalue0, err8 := (strconv.ParseInt(flag.Arg(1), 10, 64))
-    if err8 != nil {
-      Usage()
-      return
-    }
-    value0 := argvalue0
-    argvalue1, err9 := (strconv.ParseInt(flag.Arg(2), 10, 64))
-    if err9 != nil {
-      Usage()
-      return
-    }
-    value1 := argvalue1
-    argvalue2, err10 := (strconv.ParseInt(flag.Arg(3), 10, 64))
-    if err10 != nil {
-      Usage()
-      return
-    }
-    value2 := argvalue2
-    fmt.Print(client.TimeoutedAdd(context.Background(), value0, value1, value2))
+    fmt.Print(client.Fail(context.Background()))
     fmt.Print("\n")
     break
   case "":
