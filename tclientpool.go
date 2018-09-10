@@ -2,6 +2,7 @@ package tclientpool
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/jolestar/go-commons-pool"
@@ -71,7 +72,16 @@ func (p *TClientPool) Call(ctx context.Context, method string, args, result thri
 	if err != nil {
 		return err
 	}
-	defer func() { err = p.pool.ReturnObject(ctx, obj) }()
+	defer func() {
+		// err = p.pool.ReturnObject(ctx, obj)
+		if e := p.pool.ReturnObject(ctx, obj); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = fmt.Errorf("%s; %s", err.Error(), e.Error())
+			}
+		}
+	}()
 	err = obj.(*wrappedClient).Call(ctx, method, args, result)
 	return
 }
