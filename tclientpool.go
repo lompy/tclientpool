@@ -8,9 +8,12 @@ import (
 	"github.com/jolestar/go-commons-pool"
 )
 
+const defaultMaxUsageCount = 100
+
 type wrappedClient struct {
-	transport thrift.TTransport
-	client    thrift.TClient
+	transport  thrift.TTransport
+	client     thrift.TClient
+	usageCount int
 }
 
 func (c *wrappedClient) Open() error {
@@ -35,6 +38,7 @@ type TClientFactory func() (thrift.TTransport, thrift.TClient, error)
 // pooledObjectFactory implements pool.PoolObjectFactory interface.
 type pooledObjectFactory struct {
 	tClientFactory TClientFactory
+	maxUsageCount  int
 }
 
 func (f *pooledObjectFactory) MakeObject(_ctx context.Context) (*pool.PooledObject, error) {
@@ -42,7 +46,7 @@ func (f *pooledObjectFactory) MakeObject(_ctx context.Context) (*pool.PooledObje
 	if err != nil {
 		return nil, err
 	}
-	return pool.NewPooledObject(&wrappedClient{t, c}), nil
+	return pool.NewPooledObject(&wrappedClient{transport: t, client: c}), nil
 }
 
 func (f *pooledObjectFactory) DestroyObject(_ctx context.Context, po *pool.PooledObject) error {
@@ -50,14 +54,21 @@ func (f *pooledObjectFactory) DestroyObject(_ctx context.Context, po *pool.Poole
 }
 
 func (f *pooledObjectFactory) ValidateObject(_ctx context.Context, po *pool.PooledObject) bool {
-	return po.Object.(*wrappedClient).IsOpen()
+	client := po.Object.(*wrappedClient)
+	if f.maxUsageCount < 0 || client.usageCount < f.maxUsageCount {
+		return client.IsOpen()
+	} else {
+		return false
+	}
 }
 
 func (f *pooledObjectFactory) ActivateObject(_ctx context.Context, po *pool.PooledObject) error {
 	return po.Object.(*wrappedClient).Open()
 }
 
-func (f *pooledObjectFactory) PassivateObject(_ctx context.Context, _po *pool.PooledObject) error {
+func (f *pooledObjectFactory) PassivateObject(_ctx context.Context, po *pool.PooledObject) error {
+	client := po.Object.(*wrappedClient)
+	client.usageCount++
 	return nil
 }
 
@@ -73,7 +84,6 @@ func (p *TClientPool) Call(ctx context.Context, method string, args, result thri
 		return err
 	}
 	defer func() {
-		// err = p.pool.ReturnObject(ctx, obj)
 		if e := p.pool.ReturnObject(ctx, obj); e != nil {
 			if err == nil {
 				err = e
@@ -92,14 +102,37 @@ func (p *TClientPool) Close() {
 	return
 }
 
+// TClientPoolOptions contains options for TClientPool
+type TClientPoolOptions struct {
+	Factory       TClientFactory
+	MaxTotal      int
+	MaxUsageCount int
+}
+
+// NewTClientPool initializes new TClientPool by TClientFactory and maxTotal of object in pool.
+func NewTClientPoolWithOptions(options TClientPoolOptions) *TClientPool {
+	ctx := context.Background()
+
+	maxUsageCount := options.MaxUsageCount
+	if maxUsageCount == 0 {
+		maxUsageCount = defaultMaxUsageCount
+	}
+	p := pool.NewObjectPoolWithDefaultConfig(ctx, &pooledObjectFactory{options.Factory, maxUsageCount})
+	p.Config.MaxTotal = options.MaxTotal
+	p.Config.MaxIdle = options.MaxTotal
+	p.Config.TestOnBorrow = true
+
+	return &TClientPool{p}
+}
+
 // NewTClientPool initializes new TClientPool by TClientFactory and maxTotal of object in pool.
 func NewTClientPool(f TClientFactory, maxTotal int) *TClientPool {
 	ctx := context.Background()
-	p := pool.NewObjectPoolWithDefaultConfig(ctx, &pooledObjectFactory{f})
+
+	p := pool.NewObjectPoolWithDefaultConfig(ctx, &pooledObjectFactory{f, 0})
 	p.Config.MaxTotal = maxTotal
 	p.Config.MaxIdle = maxTotal
-	p.Config.TestOnCreate = true
 	p.Config.TestOnBorrow = true
-	p.Config.TestOnReturn = true
+
 	return &TClientPool{p}
 }

@@ -46,7 +46,7 @@ func Test_ParallelCalls(t *testing.T) {
 		return tr, c, nil
 	}
 
-	pool := NewTClientPool(factory, 10)
+	pool := NewTClientPoolWithOptions(TClientPoolOptions{Factory: factory, MaxTotal: 10})
 	defer pool.Close()
 	client := example.NewExampleClient(pool)
 
