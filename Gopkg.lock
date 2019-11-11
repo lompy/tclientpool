@@ -4,8 +4,8 @@
 [[projects]]
   name = "github.com/apache/thrift"
   packages = ["lib/go/thrift"]
-  revision = "327ebb6c2b6df8bf075da02ef45a2a034e9b79ba"
-  version = "0.11.0"
+  revision = "384647d290e2e4a55a14b1b7ef1b7e66293a2c33"
+  version = "v0.12.0"
 
 [[projects]]
   name = "github.com/jolestar/go-commons-pool"
@@ -17,15 +17,9 @@
   revision = "3f5d5f81046da81d73466f44fe6e0ac36ff304bd"
   version = "v2.0.0"
 
-[[projects]]
-  branch = "master"
-  name = "golang.org/x/net"
-  packages = ["context"]
-  revision = "922f4815f713f213882e8ef45e0d315b164d705c"
-
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c2833ab079acdc1eca3ca5502166ead6b95fd9aee868287737fc02934fb6e912"
+  inputs-digest = "5f9d9f9569431aed79a3edabf76081f6ca1e4c1a7dab9fda50ab8e5c84265440"
   solver-name = "gps-cdcl"
   solver-version = 1
