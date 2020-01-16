@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"tclientpool/example"
+	"github.com/wheely/tclientpool/example"
 
 	"github.com/apache/thrift/lib/go/thrift"
 )
