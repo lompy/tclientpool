@@ -14,7 +14,7 @@ import (
         "strconv"
         "strings"
         "github.com/apache/thrift/lib/go/thrift"
-        "tclientpool/example"
+        "github.com/wheely/tclientpool/example"
 )
 
 
