@@ -1,11 +1,13 @@
-package tclientpool
+package tclientpool_test
 
 import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
-	"tclientpool/example"
+	"github.com/wheely/tclientpool"
+	"github.com/wheely/tclientpool/example"
 
 	"github.com/apache/thrift/lib/go/thrift"
 )
@@ -36,6 +38,9 @@ func Test_ParallelCalls(t *testing.T) {
 		defer func() { t.Error(server.Stop()) }()
 	}()
 
+	// Wait server start
+	time.Sleep(time.Second * 3)
+
 	protFactory := thrift.NewTBinaryProtocolFactoryDefault()
 	factory := func() (thrift.TTransport, thrift.TClient, error) {
 		tr, err := thrift.NewTSocket(addr)
@@ -46,7 +51,7 @@ func Test_ParallelCalls(t *testing.T) {
 		return tr, c, nil
 	}
 
-	pool := NewTClientPoolWithOptions(TClientPoolOptions{Factory: factory, MaxTotal: 10})
+	pool := tclientpool.NewTClientPoolWithOptions(tclientpool.TClientPoolOptions{Factory: factory, MaxTotal: 10})
 	defer pool.Close()
 	client := example.NewExampleClient(pool)
 

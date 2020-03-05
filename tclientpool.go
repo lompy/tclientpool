@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/jolestar/go-commons-pool"
+	pool "github.com/jolestar/go-commons-pool"
 )
 
 const defaultMaxUsageCount = 100
@@ -57,9 +57,9 @@ func (f *pooledObjectFactory) ValidateObject(_ctx context.Context, po *pool.Pool
 	client := po.Object.(*wrappedClient)
 	if f.maxUsageCount < 0 || client.usageCount < f.maxUsageCount {
 		return client.IsOpen()
-	} else {
-		return false
 	}
+
+	return false
 }
 
 func (f *pooledObjectFactory) ActivateObject(_ctx context.Context, po *pool.PooledObject) error {
@@ -109,7 +109,7 @@ type TClientPoolOptions struct {
 	MaxUsageCount int
 }
 
-// NewTClientPool initializes new TClientPool by TClientFactory and maxTotal of object in pool.
+// NewTClientPoolWithOptions initializes new TClientPool by TClientFactory and maxTotal of object in pool.
 func NewTClientPoolWithOptions(options TClientPoolOptions) *TClientPool {
 	ctx := context.Background()
 
